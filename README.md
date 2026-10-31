@@ -136,6 +136,8 @@ tests/            # 11 个单元测试，含 causal leakage 测试
 results/          # 已提交的训练指标、loss 曲线、样本
 ```
 
+建议阅读顺序：`data.py` → `model.py` → `tests/test_model.py` → `train.py` → `docs/math.md`。先看形状和 mask 测试，再看训练循环，最后用数学笔记把公式与代码逐行对上。
+
 ---
 
 ## 测试

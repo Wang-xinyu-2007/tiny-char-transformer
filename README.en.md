@@ -134,6 +134,8 @@ tests/            # 11 unit tests, including a causal-leakage test
 results/          # committed metrics, loss curve, and sample
 ```
 
+Suggested reading order: `data.py` → `model.py` → `tests/test_model.py` → `train.py` → `docs/math.md`. Start with shapes and the mask test, then the training loop, then match each equation in the notes to the code.
+
 The math notes are currently written in Chinese. The code, docstrings, and this README are in English.
 
 ---
