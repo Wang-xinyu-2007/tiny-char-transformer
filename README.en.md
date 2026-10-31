@@ -73,7 +73,7 @@ The model is small, so the sample contains spelling and logical errors. The poin
 ```bash
 git clone https://github.com/Wang-xinyu-2007/tiny-char-transformer.git
 cd tiny-char-transformer
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 
 # Downloads Tiny Shakespeare and verifies its SHA-256.
 python train.py
@@ -83,6 +83,8 @@ python generate.py --prompt "ROMEO:" --tokens 300
 
 python -m pytest -q
 ```
+
+`requirements-dev.txt` includes runtime dependencies, pytest, and Ruff; use `requirements.txt` if you only need training and sampling.
 
 Fast smoke test:
 

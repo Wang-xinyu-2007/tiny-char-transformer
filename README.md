@@ -74,7 +74,7 @@ My an
 git clone https://github.com/Wang-xinyu-2007/tiny-char-transformer.git
 cd tiny-char-transformer
 
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 
 # 首次运行会自动下载 Tiny Shakespeare 并校验 SHA-256
 python train.py
@@ -85,6 +85,8 @@ python generate.py --prompt "ROMEO:" --tokens 300
 # 跑测试
 python -m pytest -q
 ```
+
+`requirements-dev.txt` 包含训练依赖、pytest 和 Ruff；只想训练/采样时用 `requirements.txt` 即可。
 
 只想快速验证流程，可以只跑 50 步：
 
