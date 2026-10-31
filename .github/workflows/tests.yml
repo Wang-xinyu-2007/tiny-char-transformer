@@ -20,4 +20,4 @@ jobs:
       - name: Install test dependency
         run: pip install "pytest>=8"
       - name: Run tests
-        run: pytest
+        run: python -m pytest
