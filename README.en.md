@@ -41,6 +41,8 @@ Trained on Tiny Shakespeare (1,115,394 characters, 65-character vocabulary):
 
 Loss curve: [`results/loss_curve.png`](results/loss_curve.png) · metrics: [`results/metrics.json`](results/metrics.json) · samples: [`results/samples.txt`](results/samples.txt)
 
+![Training and validation loss](results/loss_curve.png)
+
 The 1,200-step baseline ([`results/runs/1200-steps.json`](results/runs/1200-steps.json)) reached a best validation loss of 2.2156 (perplexity 9.17). Extending the run to 3,000 steps lowered it to 1.8988. This is a budget comparison on one small model, not a scaling-law experiment.
 
 Sample (`ROMEO:`, temperature 0.8, top-k 40, first 300 characters):

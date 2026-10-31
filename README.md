@@ -41,6 +41,8 @@
 
 训练曲线：[`results/loss_curve.png`](results/loss_curve.png) · 指标：[`results/metrics.json`](results/metrics.json) · 采样：[`results/samples.txt`](results/samples.txt)
 
+![训练与验证损失曲线](results/loss_curve.png)
+
 同模型、同数据下，1,200 步的基线（[`results/runs/1200-steps.json`](results/runs/1200-steps.json)）最佳验证损失为 2.2156、困惑度 9.17；继续训练到 3,000 步把验证损失降到 1.8988。这个对比只说明“训练更久在这个小模型上仍有收益”，不是严格的 scaling law 实验。
 
 生成示例（prompt = `ROMEO:`，temperature = 0.8，top-k = 40，截取前 300 个字符）：
