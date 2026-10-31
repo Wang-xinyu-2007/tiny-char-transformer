@@ -20,6 +20,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top_k", type=int, default=40)
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="recompute the prefix every step instead of using a KV cache",
+    )
     return parser.parse_args()
 
 
@@ -49,6 +54,7 @@ def main() -> None:
         max_new_tokens=args.tokens,
         temperature=args.temperature,
         top_k=args.top_k,
+        use_cache=not args.no_cache,
     )[0].tolist()
     print(tokenizer.decode(output))
 

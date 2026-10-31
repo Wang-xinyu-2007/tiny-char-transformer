@@ -30,6 +30,9 @@ class GPTConfig:
     tie_weights: bool = True
 
 
+KVCache = tuple[torch.Tensor, torch.Tensor]
+
+
 class CausalSelfAttention(nn.Module):
     """Multi-head self-attention with a lower-triangular causal mask."""
 
@@ -57,15 +60,10 @@ class CausalSelfAttention(nn.Module):
             persistent=False,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        batch_size, seq_len, channels = x.shape
-        if seq_len > self.causal_mask.shape[-1]:
-            raise ValueError(
-                f"sequence length {seq_len} exceeds block size "
-                f"{self.causal_mask.shape[-1]}"
-            )
-
-        # (B, T, 3C) -> three (B, n_head, T, head_dim) tensors.
+    def _project_qkv(
+        self, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        batch_size, seq_len, _ = x.shape
         query, key, value = self.c_attn(x).split(self.n_embd, dim=2)
         query = query.view(
             batch_size, seq_len, self.n_head, self.head_dim
@@ -76,21 +74,58 @@ class CausalSelfAttention(nn.Module):
         value = value.view(
             batch_size, seq_len, self.n_head, self.head_dim
         ).transpose(1, 2)
+        return query, key, value
 
-        # Scaled dot-product attention: QK^T / sqrt(d_k).
+    def _attend(
+        self,
+        x: torch.Tensor,
+        past_kv: KVCache | None = None,
+    ) -> tuple[torch.Tensor, KVCache]:
+        """Attend to the current tokens plus an optional cached prefix."""
+        batch_size, seq_len, channels = x.shape
+        query, key, value = self._project_qkv(x)
+
+        past_len = 0 if past_kv is None else past_kv[0].size(2)
+        total_len = past_len + seq_len
+        if total_len > self.causal_mask.shape[-1]:
+            raise ValueError(
+                f"sequence length {total_len} exceeds block size "
+                f"{self.causal_mask.shape[-1]}"
+            )
+        if past_kv is not None:
+            key = torch.cat((past_kv[0], key), dim=2)
+            value = torch.cat((past_kv[1], value), dim=2)
+
+        # Query positions start after the cached prefix. A query at position t
+        # may attend to keys 0..t, including the token just appended.
+        query_positions = torch.arange(
+            past_len, total_len, device=x.device
+        ).unsqueeze(1)
+        key_positions = torch.arange(total_len, device=x.device).unsqueeze(0)
+        allowed = key_positions <= query_positions
+
         attention = (query @ key.transpose(-2, -1)) / math.sqrt(self.head_dim)
-        attention = attention.masked_fill(
-            self.causal_mask[:, :, :seq_len, :seq_len] == 0,
-            float("-inf"),
-        )
+        attention = attention.masked_fill(~allowed, float("-inf"))
         attention = F.softmax(attention, dim=-1)
         attention = self.attn_dropout(attention)
 
-        output = attention @ value  # (B, n_head, T, head_dim)
+        output = attention @ value
         output = output.transpose(1, 2).contiguous().view(
             batch_size, seq_len, channels
         )
-        return self.resid_dropout(self.c_proj(output))
+        return self.resid_dropout(self.c_proj(output)), (key, value)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        output, _ = self._attend(x)
+        return output
+
+    def forward_with_cache(
+        self,
+        x: torch.Tensor,
+        past_kv: KVCache | None = None,
+    ) -> tuple[torch.Tensor, KVCache]:
+        """Return the attention output and the extended key/value cache."""
+        return self._attend(x, past_kv)
 
 
 class MLP(nn.Module):
@@ -124,6 +159,16 @@ class Block(nn.Module):
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
+
+    def forward_with_cache(
+        self,
+        x: torch.Tensor,
+        past_kv: KVCache | None = None,
+    ) -> tuple[torch.Tensor, KVCache]:
+        attention, new_kv = self.attn.forward_with_cache(self.ln_1(x), past_kv)
+        x = x + attention
+        x = x + self.mlp(self.ln_2(x))
+        return x, new_kv
 
 
 class GPT(nn.Module):
@@ -203,37 +248,115 @@ class GPT(nn.Module):
         return logits, loss
 
     @torch.no_grad()
+    def forward_with_cache(
+        self,
+        idx: torch.Tensor,
+        past_kv: list[KVCache] | None = None,
+        position_offset: int = 0,
+    ) -> tuple[torch.Tensor, list[KVCache]]:
+        """Forward one or more tokens while reusing cached keys and values.
+
+        `position_offset` must equal the number of cached positions. For a
+        prefill call pass `past_kv=None, position_offset=0`; for each new token
+        pass the cache returned by the previous call and
+        `position_offset=idx.size(1)-1`.
+        """
+        if idx.size(1) == 0:
+            raise ValueError("cannot forward an empty sequence")
+        past_len = 0 if past_kv is None else past_kv[0][0].size(2)
+        if position_offset != past_len:
+            raise ValueError(
+                f"position_offset {position_offset} does not match cached length {past_len}"
+            )
+        total_len = position_offset + idx.size(1)
+        if total_len > self.config.block_size:
+            raise ValueError(
+                f"sequence length {total_len} exceeds block size {self.config.block_size}"
+            )
+
+        positions = torch.arange(
+            position_offset, total_len, device=idx.device, dtype=torch.long
+        )
+        token_embedding = self.transformer["wte"](idx)
+        position_embedding = self.transformer["wpe"](positions)
+        x = self.transformer["drop"](token_embedding + position_embedding)
+
+        caches: list[KVCache | None] = [None] * len(self.transformer["blocks"]) if past_kv is None else past_kv
+        if len(caches) != len(self.transformer["blocks"]):
+            raise ValueError("cache does not match the number of layers")
+        new_caches: list[KVCache] = []
+        for block, cache in zip(self.transformer["blocks"], caches, strict=True):
+            x, new_cache = block.forward_with_cache(x, cache)
+            new_caches.append(new_cache)
+
+        x = self.transformer["ln_f"](x)
+        logits = self.lm_head(x)
+        return logits, new_caches
+
+    @staticmethod
+    def _sample_next(
+        logits: torch.Tensor,
+        temperature: float,
+        top_k: int | None,
+    ) -> torch.Tensor:
+        logits = logits[:, -1, :]
+        if temperature == 0:
+            return torch.argmax(logits, dim=-1, keepdim=True)
+        logits = logits / temperature
+        if top_k is not None:
+            k = min(top_k, logits.size(-1))
+            top_values = torch.topk(logits, k).values
+            threshold = top_values[:, [-1]]
+            logits = logits.masked_fill(logits < threshold, float("-inf"))
+        probabilities = F.softmax(logits, dim=-1)
+        return torch.multinomial(probabilities, num_samples=1)
+
+    @torch.no_grad()
     def generate(
         self,
         idx: torch.Tensor,
         max_new_tokens: int,
         temperature: float = 1.0,
         top_k: int | None = None,
+        use_cache: bool = True,
     ) -> torch.Tensor:
-        """Autoregressively sample tokens, cropping context to block_size."""
+        """Autoregressively sample tokens.
+
+        The KV cache avoids recomputing the prefix and is used when the whole
+        sequence fits in the context window. For longer generations the method
+        falls back to recomputing the sliding window, because absolute learned
+        position embeddings cannot be shifted without re-encoding.
+        """
         if max_new_tokens < 0:
             raise ValueError("max_new_tokens must be non-negative")
         if temperature < 0:
             raise ValueError("temperature must be non-negative")
+        if top_k is not None and top_k <= 0:
+            raise ValueError("top_k must be positive")
+        if idx.size(1) == 0:
+            raise ValueError("prompt must contain at least one token")
+        if max_new_tokens == 0:
+            return idx
 
         self.eval()
+        idx = idx[:, -self.config.block_size :]
+        if use_cache and idx.size(1) + max_new_tokens <= self.config.block_size:
+            logits, caches = self.forward_with_cache(idx)
+            for step in range(max_new_tokens):
+                next_token = self._sample_next(logits, temperature, top_k)
+                idx = torch.cat((idx, next_token), dim=1)
+                if step == max_new_tokens - 1:
+                    break
+                logits, caches = self.forward_with_cache(
+                    next_token,
+                    past_kv=caches,
+                    position_offset=idx.size(1) - 1,
+                )
+            return idx
+
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -self.config.block_size :]
-            logits, _ = self(idx_cond)
-            logits = logits[:, -1, :]  # logits for the next token
-
-            if temperature == 0:
-                next_token = torch.argmax(logits, dim=-1, keepdim=True)
-            else:
-                logits = logits / temperature
-                if top_k is not None:
-                    k = min(top_k, logits.size(-1))
-                    top_values = torch.topk(logits, k).values
-                    threshold = top_values[:, [-1]]
-                    logits = logits.masked_fill(logits < threshold, float("-inf"))
-                probabilities = F.softmax(logits, dim=-1)
-                next_token = torch.multinomial(probabilities, num_samples=1)
-
+            logits, _ = self(idx[:, -self.config.block_size :])
+            next_token = self._sample_next(logits, temperature, top_k)
             idx = torch.cat((idx, next_token), dim=1)
         return idx
 
