@@ -12,7 +12,7 @@ license = { text = "MIT" }
 dependencies = ["torch>=2.2"]
 
 [project.optional-dependencies]
-dev = ["matplotlib>=3.8", "pytest>=8"]
+dev = ["matplotlib>=3.8", "pytest>=8", "ruff>=0.9"]
 train = ["matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]

@@ -55,7 +55,7 @@ class CharTokenizer:
     chars: tuple[str, ...]
 
     @classmethod
-    def from_text(cls, text: str) -> "CharTokenizer":
+    def from_text(cls, text: str) -> CharTokenizer:
         return cls(tuple(sorted(set(text))))
 
     @property

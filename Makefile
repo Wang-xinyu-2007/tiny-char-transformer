@@ -4,6 +4,7 @@ install:
 	python -m pip install -r requirements-dev.txt
 
 test:
+	python -m ruff check .
 	python -m pytest -q
 
 train:

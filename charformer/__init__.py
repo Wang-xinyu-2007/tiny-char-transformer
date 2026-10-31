@@ -4,8 +4,8 @@ from .data import CharTokenizer, ensure_dataset, get_batch, load_tokenized_datas
 from .model import GPT, GPTConfig
 
 __all__ = [
-    "CharTokenizer",
     "GPT",
+    "CharTokenizer",
     "GPTConfig",
     "ensure_dataset",
     "get_batch",

@@ -23,7 +23,12 @@ from pathlib import Path
 
 import torch
 
-from charformer.data import DATASET_SHA256, ensure_dataset, get_batch, load_tokenized_dataset
+from charformer.data import (
+    DATASET_SHA256,
+    ensure_dataset,
+    get_batch,
+    load_tokenized_dataset,
+)
 from charformer.model import GPT, GPTConfig
 
 
