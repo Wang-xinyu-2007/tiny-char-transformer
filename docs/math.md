@@ -232,13 +232,56 @@ $$
 
 ---
 
-## 11. 测试证明了什么
+## 11. KV cache：为什么能省计算
 
-`tests/test_model.py::test_causal_attention_cannot_see_future_tokens` 构造两条前缀相同、未来不同的序列，检查前缀位置的 logits 是否完全一致。它验证的是因果性这个可观察不变量，而不是证明整个实现无误。其余测试覆盖形状、损失有限性、生成长度、权重绑定和 tokenizer 往返。
+没有缓存时，生成第 $t$ 个 token 需要重新计算整个前缀：
+
+$$
+\text{cost}_{\text{no cache}}
+= O(T^2d) \quad \text{(attention)}
++ O(Td^2) \quad \text{(projections + MLP)}.
+$$
+
+有缓存时，只计算当前 token 的 $q_t$，并把新的 $k_t,v_t$ 追加到缓存：
+
+$$
+K_{1:t}=[K_{1:t-1};k_t],\qquad V_{1:t}=[V_{1:t-1};v_t],
+$$
+
+$$
+\text{attention}_t=\operatorname{softmax}\left(\frac{q_tK_{1:t}^\top}{\sqrt{d_k}}\right)V_{1:t}.
+$$
+
+每步成本变成 $O(Td)$ 的注意力加 $O(d^2)$ 的投影/MLP，省掉的是**对旧 token 的重复投影和全量注意力**。缓存显存约为
+
+$$
+2\cdot N_{\text{layer}}\cdot T\cdot d
+$$
+
+个数（每个 token、每层存 K 和 V）。
+
+代码里缓存是每层一个 `(K, V)`；prefill 一次 prompt，然后每次只喂一个新 token。位置偏移必须与缓存长度一致，causal mask 用 `key_position <= query_position` 动态构造。
+
+**边界**：本项目用可学习的绝对位置嵌入。序列超过 `block_size` 后，旧 K/V 里编码的是旧位置；直接丢掉最前面的 K/V 会让剩余 token 的位置错位。所以超出窗口时回退到窗口重算，而不是悄悄产生错误结果。RoPE 等相对位置方案可以让滑动窗口缓存更容易实现，这是下一步。
 
 ---
 
-## 12. 参考资料
+## 12. 测试证明了什么
+
+`tests/test_model.py::test_causal_attention_cannot_see_future_tokens` 构造两条前缀相同、未来不同的序列，检查前缀位置的 logits 是否完全一致。它验证的是因果性这个可观察不变量，而不是证明整个实现无误。
+
+`tests/test_cache.py` 进一步检查：
+
+- prefill 的 logits 与全量前向一致；
+- 增量 token 的 logits 与把它拼进完整序列后一致；
+- cached 与 uncached 的 greedy 生成完全一致；
+- 缓存长度、位置偏移错误、超窗口回退。
+
+其余测试覆盖形状、损失有限性、生成长度、权重绑定、tokenizer 往返和 batch 对齐。
+
+---
+
+## 13. 参考资料
 
 - Vaswani et al., *Attention Is All You Need* (2017)
 - Radford et al., *Language Models are Unsupervised Multitask Learners* (GPT-2, 2019)

@@ -66,6 +66,19 @@ My an
 
 The model is small, so the sample contains spelling and logical errors. The point is a reproducible result, not chat quality.
 
+### Depth ablation: 2 layers vs 4 layers
+
+Same data, seed, batch size, context length, optimizer, and **1,500-step budget**; only `n_layer` changes:
+
+| Layers | Parameters | Best validation loss | Validation perplexity |
+| --- | --- | --- | --- |
+| 2 | 421,504 | 2.2799 | 9.78 |
+| 4 | 818,048 | 2.0316 | 7.63 |
+
+The 4-layer value is from the main 3,000-step run at step 1,500; the 2-layer number is a separate run. Artifacts are in [`results/ablation_2layer/`](results/ablation_2layer/).
+
+This is one seed and one budget, not a scaling-law study. It shows that extra depth used its capacity on this small corpus; it does not prove that more layers always help.
+
 ---
 
 ## Quickstart
@@ -118,8 +131,33 @@ character ids
 | Initialization | Normal(0, 0.02); residual projections scaled by `1/√(2N)` |
 | Optimization | AdamW, linear warmup + cosine decay, gradient clipping at 1.0 |
 | Evaluation | Fixed validation split; best validation-loss checkpoint |
+| Generation | KV-cache incremental decoding; falls back to window recomputation beyond `block_size` |
 
 `F.scaled_dot_product_attention` is intentionally not used: the attention matrix, mask, softmax, and dropout are written out so they can be checked against the equations. A production implementation should use a fused kernel.
+
+---
+
+## KV cache and incremental decoding
+
+Vanilla generation recomputes the whole prefix at every step. This implementation stores each layer's keys and values:
+
+```text
+prefill:  prompt  → per-layer cache (K, V)
+decode:   new token → Q for the current token only
+          K/V appended to the cache
+          dynamic causal mask: key_position <= query_position
+```
+
+`model.generate(..., use_cache=True)` uses the cache; `generate.py --no-cache` forces recomputation. The cache is used when `prompt + new_tokens <= block_size`. Because this model uses learned absolute position embeddings, sliding past the window would require re-encoding the old keys/values, so longer generations fall back to recomputation. That is an explicit implementation boundary, not a bug.
+
+CPU benchmark over 96 tokens (`python benchmark.py`, JSON in [`results/cache_benchmark.json`](results/cache_benchmark.json)):
+
+| Mode | tokens/s | Relative |
+| --- | --- | --- |
+| Recomputation | 406.7 | 1.00× |
+| KV cache | 533.9 | **1.31×** |
+
+The model is tiny with a 128-token window, so the gain is limited. Cached and uncached greedy outputs are tested to be identical.
 
 ---
 
@@ -130,13 +168,14 @@ charformer/
   model.py        # GPTConfig, CausalSelfAttention, MLP, Block, GPT
   data.py         # tokenizer, checksum-verified download, batch sampler
 train.py          # training loop, evaluation, checkpointing, plots, sample
-generate.py       # continuation from a checkpoint
+generate.py       # continuation from a checkpoint (cache on/off)
+benchmark.py      # cached vs recomputed decoding
 docs/math.md      # derivations: cross-entropy, attention, masks, backprop
-tests/            # 11 unit tests, including a causal-leakage test
-results/          # committed metrics, loss curve, and sample
+tests/            # 17 unit tests, including causal-leakage and KV-cache tests
+results/          # committed metrics, loss curve, sample, cache benchmark
 ```
 
-Suggested reading order: `data.py` → `model.py` → `tests/test_model.py` → `train.py` → `docs/math.md`. Start with shapes and the mask test, then the training loop, then match each equation in the notes to the code.
+Suggested reading order: `data.py` → `model.py` → `tests/test_model.py` → `tests/test_cache.py` → `train.py` → `docs/math.md`. Start with shapes and the mask test, then incremental decoding, then match each equation in the notes to the code.
 
 The math notes are currently written in Chinese. The code, docstrings, and this README are in English.
 
@@ -148,9 +187,9 @@ The math notes are currently written in Chinese. The code, docstrings, and this 
 python -m pytest -q
 ```
 
-The suite covers forward shapes, finite loss, causal leakage, generation length, block-size rejection, weight tying, tokenizer round-trip, shifted targets, and the train/validation split.
+The suite covers forward shapes, finite loss, causal leakage, generation length, block-size rejection, weight tying, tokenizer round-trip, shifted targets, and the train/validation split. KV-cache tests check prefill vs full forward, incremental token vs full sequence, cached vs uncached greedy generation, cache length, and the long-generation fallback.
 
-The causal-leakage test is the important one: changing future tokens must not change the logits at earlier positions. It is an observable invariant, not a proof of the whole implementation.
+The two key invariants are causal leakage (no future information) and cache consistency (no missing or extra position).
 
 ---
 
@@ -158,11 +197,11 @@ The causal-leakage test is the important one: changing future tokens must not ch
 
 - **Character-level, not BPE:** small vocabulary and a simple pipeline make attention and optimization easy to inspect.
 - **0.8M parameters:** CPU-trainable, but capacity is limited; samples contain errors.
-- **No KV cache:** generation recomputes the whole context, which is readable but inefficient.
+- **KV cache has a boundary:** it reuses keys/values inside `block_size`; beyond that it falls back to recomputation because absolute positions cannot be shifted without re-encoding.
 - **No mixed precision or distributed training:** this is a single-device teaching implementation.
 - **One corpus:** the validation loss measures Shakespeare-style fitting, not general English understanding.
 
-Natural next steps: BPE tokenization, KV cache, learned vs RoPE positional encodings, width/depth ablations, and a larger held-out corpus.
+Natural next steps: BPE tokenization, RoPE / relative positions, a FlashAttention comparison, width ablations, multi-seed stability runs, and a larger held-out corpus.
 
 ---
 
