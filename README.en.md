@@ -94,6 +94,9 @@ python train.py
 # Continue from the best checkpoint.
 python generate.py --prompt "ROMEO:" --tokens 300
 
+# Optional: compare KV-cache and recomputed decoding.
+python benchmark.py
+
 python -m pytest -q
 ```
 

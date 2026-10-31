@@ -95,6 +95,9 @@ python train.py
 # 用最佳 checkpoint 续写
 python generate.py --prompt "ROMEO:" --tokens 300
 
+# 可选：对比 KV cache 与逐步重算
+python benchmark.py
+
 # 跑测试
 python -m pytest -q
 ```
