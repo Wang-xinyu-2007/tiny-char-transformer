@@ -1,0 +1,11 @@
+{
+  "device": "cpu",
+  "block_size": 128,
+  "new_tokens": 96,
+  "uncached_seconds": 0.236,
+  "cached_seconds": 0.18,
+  "speedup": 1.313,
+  "uncached_tokens_per_sec": 406.7,
+  "cached_tokens_per_sec": 533.9,
+  "greedy_outputs_match": true
+}

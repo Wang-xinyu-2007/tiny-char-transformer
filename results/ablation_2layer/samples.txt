@@ -1,0 +1,12 @@
+prompt: 'ROMEO:'
+temperature: 0.8, top_k: 40, tokens: 200
+
+ROMEO:
+Du thier his dor some tigh thir thin sthe'd les ome mase hat my thare
+he nod, t lis aver wabed that e osis somar mand o cons wathor ut
+ses cor busth, n the aral hator What sthis.
+
+
+
+RKESCFRYIUS:
+Thar

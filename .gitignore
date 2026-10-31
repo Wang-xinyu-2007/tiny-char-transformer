@@ -5,5 +5,7 @@ __pycache__/
 *.egg-info/
 data/*.txt
 results/*.pt
+results/**/*.pt
 training.log
+ablation.log
 .DS_Store

@@ -1,0 +1,56 @@
+{
+  "config": {
+    "vocab_size": 65,
+    "block_size": 128,
+    "n_layer": 2,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.1,
+    "bias": true,
+    "tie_weights": true
+  },
+  "dataset": {
+    "path": "data\\tiny_shakespeare.txt",
+    "sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "vocab_size": 65,
+    "train_tokens": 1003854,
+    "val_tokens": 111540
+  },
+  "training": {
+    "device": "cpu",
+    "max_steps": 1500,
+    "batch_size": 32,
+    "eval_iters": 40,
+    "parameter_count": 421504,
+    "wall_time_sec": 180.1,
+    "best_val_loss": 2.27988862991333,
+    "best_step": 1499,
+    "best_val_perplexity": 9.775591640413632
+  },
+  "history": [
+    {
+      "step": 0,
+      "train_loss": 4.173327445983887,
+      "val_loss": 4.168670177459717,
+      "lr": 2.9999999999999997e-06
+    },
+    {
+      "step": 500,
+      "train_loss": 2.4102582931518555,
+      "val_loss": 2.4203343391418457,
+      "lr": 0.000249171123250929
+    },
+    {
+      "step": 1000,
+      "train_loss": 2.297269821166992,
+      "val_loss": 2.318943977355957,
+      "lr": 0.00010642569521912965
+    },
+    {
+      "step": 1499,
+      "train_loss": 2.23769474029541,
+      "val_loss": 2.27988862991333,
+      "lr": 3.0000339896947713e-05
+    }
+  ]
+}
