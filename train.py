@@ -23,7 +23,7 @@ from pathlib import Path
 
 import torch
 
-from charformer.data import ensure_dataset, get_batch, load_tokenized_dataset
+from charformer.data import DATASET_SHA256, ensure_dataset, get_batch, load_tokenized_dataset
 from charformer.model import GPT, GPTConfig
 
 
@@ -41,10 +41,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dropout", type=float, default=0.1)
 
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--max_steps", type=int, default=1500)
-    parser.add_argument("--eval_interval", type=int, default=250)
+    parser.add_argument("--max_steps", type=int, default=3000)
+    parser.add_argument("--eval_interval", type=int, default=500)
     parser.add_argument("--eval_iters", type=int, default=40)
-    parser.add_argument("--log_interval", type=int, default=50)
+    parser.add_argument("--log_interval", type=int, default=100)
 
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--min_lr", type=float, default=3e-5)
@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--weight_decay", type=float, default=0.1)
     parser.add_argument("--grad_clip", type=float, default=1.0)
 
-    parser.add_argument("--sample_tokens", type=int, default=320)
+    parser.add_argument("--sample_tokens", type=int, default=400)
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top_k", type=int, default=40)
     return parser.parse_args()
@@ -317,7 +317,7 @@ def main() -> None:
                 "config": asdict(config),
                 "dataset": {
                     "path": str(data_path),
-                    "sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+                    "sha256": DATASET_SHA256,
                     "vocab_size": tokenizer.vocab_size,
                     "train_tokens": train_data.numel(),
                     "val_tokens": val_data.numel(),

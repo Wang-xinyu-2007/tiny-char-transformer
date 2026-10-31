@@ -1,0 +1,17 @@
+prompt: 'ROMEO:'
+temperature: 0.8, top_k: 40, tokens: 400
+
+ROMEO:
+As good can the rich in the what nevers a like.
+
+REOMENENTERS:
+Why such were a creation a mores you
+Parses as the a the was be land cand spee;
+Will undicers the blising me as my sect,
+The make to heads may this brabe well the dade
+proce tus my doser of where I you my but heaven.
+
+MENER:
+Mast peary tan hear, him my cher head down,
+And loownar give the with by whath call to me thou calll pay;
+My an

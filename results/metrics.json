@@ -1,0 +1,74 @@
+{
+  "config": {
+    "vocab_size": 65,
+    "block_size": 128,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.1,
+    "bias": true,
+    "tie_weights": true
+  },
+  "dataset": {
+    "path": "data\\tiny_shakespeare.txt",
+    "sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "vocab_size": 65,
+    "train_tokens": 1003854,
+    "val_tokens": 111540
+  },
+  "training": {
+    "device": "cpu",
+    "max_steps": 3000,
+    "batch_size": 32,
+    "eval_iters": 40,
+    "parameter_count": 818048,
+    "wall_time_sec": 940.4,
+    "best_val_loss": 1.8988316059112549,
+    "best_step": 2999,
+    "best_val_perplexity": 6.678087244564929
+  },
+  "history": [
+    {
+      "step": 0,
+      "train_loss": 4.203988075256348,
+      "val_loss": 4.1983160972595215,
+      "lr": 2.9999999999999997e-06
+    },
+    {
+      "step": 500,
+      "train_loss": 2.3580756187438965,
+      "val_loss": 2.3683881759643555,
+      "lr": 0.00028752268165557917
+    },
+    {
+      "step": 1000,
+      "train_loss": 2.1163063049316406,
+      "val_loss": 2.155235767364502,
+      "lr": 0.00024076025382392156
+    },
+    {
+      "step": 1500,
+      "train_loss": 1.9434640407562256,
+      "val_loss": 2.0315752029418945,
+      "lr": 0.00017230875265903135
+    },
+    {
+      "step": 2000,
+      "train_loss": 1.8436731100082397,
+      "val_loss": 1.955465316772461,
+      "lr": 0.00010176486050552833
+    },
+    {
+      "step": 2500,
+      "train_loss": 1.7977110147476196,
+      "val_loss": 1.9156818389892578,
+      "lr": 4.9324281217375474e-05
+    },
+    {
+      "step": 2999,
+      "train_loss": 1.7741769552230835,
+      "val_loss": 1.8988316059112549,
+      "lr": 3.000007921500975e-05
+    }
+  ]
+}
